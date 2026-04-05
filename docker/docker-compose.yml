@@ -1,0 +1,35 @@
+services:
+  waha:
+    image: devlikeapro/waha-plus:noweb
+    ports:
+      - "127.0.0.1:3000:3000"   # dashboard via SSH tunnel only
+    volumes:
+      - waha-sessions:/app/.sessions   # persist WhatsApp session across restarts
+    environment:
+      - WHATSAPP_DEFAULT_ENGINE=NOWEB
+      - WAHA_WEBHOOK_URL=http://app:3001/webhook
+      - WAHA_WEBHOOK_EVENTS=message
+      - WAHA_DASHBOARD_USERNAME=admin
+      - WAHA_DASHBOARD_PASSWORD=${WAHA_DASHBOARD_PASSWORD}
+      - WAHA_API_KEY=${WAHA_API_KEY}
+    restart: unless-stopped
+
+  app:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    expose:
+      - "3001"                   # internal — WAHA sends webhooks via Docker network
+    ports:
+      - "127.0.0.1:3001:3001"   # health check via SSH tunnel only
+      - "0.0.0.0:3002:3002"     # GitHub webhook — must be publicly reachable
+    env_file: ../.env
+    volumes:
+      - /opt/lapibot-courses:/app/courses
+      - /home/lapibot/.ssh/github_deploy_courses:/home/node/.ssh/github_deploy_courses:ro
+    depends_on:
+      - waha
+    restart: unless-stopped
+
+volumes:
+  waha-sessions:
