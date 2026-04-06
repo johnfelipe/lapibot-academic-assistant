@@ -130,6 +130,8 @@ media:
   voice: true
 ```
 
+See `example-course/` for a complete working example with sample config, participants, schedule, and lessons.
+
 ## System Prompt
 
 The bot's personality, behavior, and formatting rules are defined in `system-prompt.md` (included in this repo). It uses `{{placeholders}}` filled per-course from `config.yaml`:
