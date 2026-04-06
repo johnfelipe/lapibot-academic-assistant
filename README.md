@@ -1,8 +1,8 @@
 # Lapibot — AI Course Assistant for WhatsApp
 
-A production WhatsApp bot that serves as an AI teaching assistant for professional courses. Students @mention the bot in their course group or DM it directly, and it searches through course materials — lesson summaries, transcripts, schedules — using Claude's agentic tool-use to find answers and respond in context.
+Lapibot is a WhatsApp teaching assistant that serves students in professional courses, built for [AI4LAW](https://ai4law.co.il). Named after the courses' instructor, *Lapidot*, Lapibot is available 24/7, reacts to students' questions in the course's group chats or in DMs, and provides assistance with technical, academic, and logistical questions, based on the continuously-updating course materials (lesson summaries, transcripts, schedules, links, and more).
 
-Built for [AI4LAW](https://ai4law.co.il), an Israeli organization that trains lawyers to integrate AI into legal practice. The bot is live, serving real students across multiple courses in Hebrew.
+Lapibot's intelligence is built around an agentic loop using Claude API with custom tools for querying course materials. It communicates with WhatsApp using WAHA, and lives in a containerized Express app. It is deployed on a private VPS using Docker Compose, currently serving real students 24/7.
 
 > **This repository is published as a portfolio showcase.** The source code is provided for review and reference only. Course materials (lesson content, participant data, recordings) are proprietary and stored in a separate private repository. See [License](#license).
 
