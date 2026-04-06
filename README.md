@@ -11,52 +11,51 @@ Built for [AI4LAW](https://ai4law.co.il), an Israeli organization that trains la
 ## How It Works
 
 ```
-                    ┌─────────────────────────────────────────┐
-                    │              VPS (Docker Compose)        │
-                    │                                          │
-WhatsApp ──────────►│  WAHA (port 3000)                       │
-                    │    │ webhook POST /webhook               │
-                    │    ▼                                      │
-                    │  Express Server (port 3001)              │
-                    │    │                                      │
-                    │    ├─ Group message?                      │
-                    │    │   └─ @mention or reply-to-bot?       │
-                    │    │       └─ Route group ID → course     │
-                    │    │                                      │
-                    │    ├─ Direct message?                     │
-                    │    │   └─ Resolve LID → phone → enrolled?│
-                    │    │       ├─ Yes → personalized assistant│
-                    │    │       └─ No → polite rejection       │
-                    │    │                                      │
-                    │    └─ Student Bot (agentic loop)          │
-                    │        ├─ Load system prompt + course ctx │
-                    │        ├─ Fetch last ~30 messages         │
-                    │        ├─ Claude API + tools ◄──┐         │
-                    │        │   (search, read, list, │         │
-                    │        │    send files)         │         │
-                    │        └─ Send response ────────┘         │
-                    │                                          │
-                    │  GitHub Webhook (port 3002)              │
-                    │    └─ On push → git pull → hot-reload     │
-                    │                                          │
-                    └──────────────┬───────────────────────────┘
-                                   │ reads from
-                                   ▼
-                    ┌──────────────────────────────────────┐
-                    │  Courses Repository (separate git)    │
-                    │                                        │
-                    │  ├── system-prompt.md                  │
-                    │  ├── dm-not-enrolled.md                │
-                    │  └── <course>/                         │
-                    │       ├── config.yaml                  │
-                    │       ├── participants.csv             │
-                    │       ├── prompt.md                    │
-                    │       ├── schedule.md                  │
-                    │       └── lessons/                     │
-                    │           ├── lesson-01.md             │
-                    │           ├── lesson-01-transcript.txt │
-                    │           └── ...                      │
-                    └──────────────────────────────────────┘
+                              WhatsApp
+                                 │
+                                 ▼
+┌──────────────────── Docker Compose (VPS) ──────────────────────────┐
+│                                                                     │
+│  ┌─── WAHA Container ───┐     ┌─── App Container ───────────────┐ │
+│  │                       │     │                                  │ │
+│  │  NOWEB engine         │────►│  Webhook Handler                │ │
+│  │  (WhatsApp bridge)    │     │    │                             │ │
+│  │                       │     │    ├── Group message             │ │
+│  │  port 3000            │     │    │    @mention or reply?       │ │
+│  │  (SSH tunnel only)    │     │    │    yes → route group ────┐  │ │
+│  │                       │     │    │          to course       │  │ │
+│  │                       │     │    │                          │  │ │
+│  │                       │     │    └── Direct message         │  │ │
+│  │                       │     │         LID → phone           │  │ │
+│  │                       │     │         enrolled?             │  │ │
+│  │                       │     │         ├ no → rejection      │  │ │
+│  │                       │     │         └ yes → route phone ──┤  │ │
+│  │                       │     │                to course      │  │ │
+│  │                       │     │                               │  │ │
+│  │                       │     │    ┌─────────────────────◄────┘  │ │
+│  │                       │     │    │  Agentic Loop               │ │
+│  │                       │     │    │  ├ system prompt + context  │ │
+│  │                       │     │    │  ├ chat history (~30 msgs)  │ │
+│  │                       │     │    │  └ Claude API               │ │
+│  │                       │◄────│    │    tools: search, read, ◄┐ │ │
+│  │  send response        │     │    │     list, send ───────────┘ │ │
+│  │  to WhatsApp          │     │    │    (up to 10 iterations)    │ │
+│  │                       │     │    └─────────────────────────────│ │
+│  └───────────────────────┘     │                                  │ │
+│                                │  port 3001 (internal webhook)   │ │
+│                                │  port 3002 (GitHub webhook)     │ │
+│                                └─────────────┬───────────────────┘ │
+│                                               │ reads from          │
+│  ┌── Courses Volume (git-synced) ────────────▼──────────────────┐ │
+│  │  system-prompt.md     Bot personality & behavior (Hebrew)     │ │
+│  │  <course>/config.yaml Course metadata, group ID mapping       │ │
+│  │  participants.csv     Student enrollment & profiles           │ │
+│  │  lessons/             Summaries, transcripts, schedule        │ │
+│  └──────────────────────────────────────────────────────────────┘ │
+│                                               ▲                    │
+│  GitHub push → port 3002 → HMAC verify → git pull → hot-reload   │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
 ```
 
 ## The Agentic Loop
