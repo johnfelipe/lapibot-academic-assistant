@@ -1,197 +1,156 @@
-# Lapibot — Course Assistant Bot
+# Lapibot — AI Course Assistant for WhatsApp
 
-WhatsApp bot that assists students in [AI4LAW](https://ai4law.co.il)'s educational courses. Students can @mention the bot or reply to its messages in a course WhatsApp group, or DM the bot directly. The bot searches course materials and answers questions using Claude AI with agentic tool-use.
+Lapibot is a WhatsApp-based AI teaching assistant built for [AI4LAW](https://ai4law.co.il), an organization that runs professional courses on integrating AI into legal practice. The bot lives in course WhatsApp groups and answers student questions by searching through course materials using Claude AI with agentic tool-use.
 
-**Group chats:** Triggered by @mention or reply to bot. Routes by WhatsApp group ID to the matching course.
+Students interact with the bot by @mentioning it in a group chat or replying to its messages. Enrolled students can also DM the bot directly for personalized help. The bot searches lesson summaries, transcripts, schedules, and other course files — then responds in context, citing specific lessons and linking to recordings when relevant.
 
-**Direct messages:** Enrolled students (matched by phone number from `participants.csv`) get the same course assistant experience, personalized with their name and profile. Non-enrolled users receive a polite rejection message.
+This repository is the production codebase, published as a portfolio showcase. Course materials (lesson content, participant data, recordings) are proprietary and stored in a separate private repository.
 
-> **Note:** This is a portfolio showcase of the production Lapibot system. Course materials (lesson content, participant data, recordings) are not included as they are proprietary to AI4LAW.
-
-## Architecture
+## How It Works
 
 ```
-WhatsApp ──► WAHA (Docker, port 3000)
-               │ webhook
-               ▼
-           Node.js Server (Express, port 3001)
-               │
-               ├── Webhook Handler
-               │     • Group msgs: @mention / reply-to-bot → route by group ID
-               │     • DMs: resolve phone (LID → phone via WAHA API) → enrollment lookup
-               │     • Non-enrolled DMs → polite rejection
-               │
-               ├── Student Bot (per request)
-               │     • Loads course context + system prompt
-               │     • Fetches chat history for context
-               │     • Claude API with tool-use (search/read course files)
-               │     • DMs: personalized with student profile
-               │
-               ├── WAHA Client
-               │     • Send responses (text, files)
-               │     • Fetch message history
-               │     • Resolve LIDs to phone numbers
-               │
-               └── reads ──► courses/ (git-synced separate repo)
-                               ├── system-prompt.md
-                               ├── dm-not-enrolled.md
-                               └── <course>/
-                                     ├── config.yaml
-                                     ├── participants.csv
-                                     └── lessons/
+                    ┌─────────────────────────────────────────┐
+                    │              VPS (Docker)                │
+                    │                                          │
+WhatsApp ──────────►│  WAHA (port 3000)                       │
+                    │    │ webhook POST /webhook               │
+                    │    ▼                                      │
+                    │  Express Server (port 3001)              │
+                    │    │                                      │
+                    │    ├─ Is it a group message?              │
+                    │    │   └─ @mention or reply-to-bot?       │
+                    │    │       └─ Route group ID → course     │
+                    │    │                                      │
+                    │    ├─ Is it a DM?                         │
+                    │    │   └─ Resolve phone → enrolled?       │
+                    │    │       ├─ Yes → personalized assistant│
+                    │    │       └─ No → polite rejection       │
+                    │    │                                      │
+                    │    └─ Student Bot (agentic loop)          │
+                    │        ├─ Load system prompt + course ctx │
+                    │        ├─ Fetch last ~30 messages         │
+                    │        ├─ Claude API + tools ◄──┐         │
+                    │        │   (search, read, list, │         │
+                    │        │    send files)         │         │
+                    │        └─ Send response ────────┘         │
+                    │                                          │
+                    │  GitHub Webhook Server (port 3002)       │
+                    │    └─ On push → git pull → hot-reload     │
+                    │                                          │
+                    └──────────────┬───────────────────────────┘
+                                   │ reads from
+                                   ▼
+                    ┌──────────────────────────────┐
+                    │  Courses Repository (git)     │
+                    │                                │
+                    │  ├── system-prompt.md          │
+                    │  ├── dm-not-enrolled.md        │
+                    │  └── <course>/                 │
+                    │       ├── config.yaml          │
+                    │       ├── participants.csv     │
+                    │       ├── prompt.md            │
+                    │       ├── schedule.md          │
+                    │       └── lessons/             │
+                    │           ├── lesson-01.md     │
+                    │           ├── lesson-01-transcript.txt │
+                    │           └── ...              │
+                    └──────────────────────────────┘
 ```
 
-## Features
+## The Agentic Loop
 
-- **Agentic tool-use**: Bot uses Claude API tools to search, read, list, and send course files — not just static responses
-- **Multi-course**: Single instance serves multiple courses, routed by WhatsApp group ID
-- **Multimodal**: Accepts images and documents from students (per-course toggleable)
-- **DM support**: Enrolled students can chat privately with the bot for personalized help
-- **Model fallback**: Primary model (Claude Sonnet 4.6) with automatic fallback to Haiku on overload
-- **Rate limiting**: Per-group/per-chat rate limiting to prevent cost spikes
-- **Sequential queue**: Per-group message queue prevents concurrent API calls
-- **Hot-reload**: GitHub webhook auto-pulls course updates and reloads configs without restart
-- **Security**: HMAC webhook verification, path traversal protection, non-root Docker user
-- **Hebrew-first**: System prompt, bot persona, and WhatsApp formatting optimized for Hebrew (RTL)
+Lapibot is not a simple chatbot that stuffs all course content into the prompt. Instead, it uses Claude's tool-use capability to search and read course materials on demand:
 
-## Prerequisites
+1. Student asks a question
+2. Bot receives the question along with recent chat history (~30 messages for context)
+3. Claude decides which tools to call:
+   - **search_files** — grep across all course materials (lesson plans, transcripts, schedule)
+   - **read_file** — read a specific file in full
+   - **list_files** — discover what materials are available
+   - **send_file** — share a course document via WhatsApp
+4. Claude reads the tool results and may call more tools (up to 10 iterations)
+5. Final response is sent to the student, quoting the original message in groups
 
-- Node.js 20+
-- Docker & Docker Compose
-- WAHA Plus license (self-hosted WhatsApp API)
-- Anthropic API key
+This approach keeps token costs low (only loading what's needed) and scales to large course libraries without hitting context limits.
 
-## Local Development
+## Course Materials Architecture
 
-```bash
-npm install
-cp .env.example .env
-# Edit .env with your API keys
-npm run dev
-```
+Course content lives in a **separate Git repository**, mounted into the Docker container. This separation is deliberate:
 
-## Deployment
+- **Course creators update content independently** — push to the courses repo, and the bot picks up changes automatically via a GitHub webhook that triggers `git pull` + hot-reload
+- **No rigid schema required** — the only required file is `config.yaml` (course name, instructor, WhatsApp group IDs). Everything else is optional and freeform. The bot discovers and searches whatever files exist
+- **Multiple courses, one bot** — each course folder maps WhatsApp group IDs to course context. A single Lapibot instance serves all active courses
 
-### First-time setup
-
-```bash
-ssh user@vps
-
-cd /opt
-git clone <this-repo> lapibot-course-assistant
-git clone <courses-repo> lapibot-courses
-
-cd lapibot-course-assistant
-cp .env.example .env
-# Edit .env with real values
-
-docker compose -f docker/docker-compose.yml up -d
-
-# Authenticate WAHA: SSH tunnel to port 3000, open dashboard, scan QR
-ssh -L 3000:localhost:3000 user@vps
-# Then open http://localhost:3000 in browser
-```
-
-### Ongoing deploys
-
-```bash
-npm run deploy    # SSH → git pull both repos → docker compose up --build
-npm run logs      # Tail app container logs
-```
-
-## Course Structure
-
-Each course lives in a separate folder within the courses repo:
-
-```
-my-course/
-├── config.yaml        # required: course metadata + group IDs
-├── participants.csv   # optional: student data (enables DM access + personalization)
-├── prompt.md          # optional: custom bot instructions
-├── schedule.md        # optional: class schedule
-└── lessons/           # optional: lesson plans, transcripts
-    ├── 01-intro.md
-    └── ...
-```
-
-Example `config.yaml`:
+The `config.yaml` maps a course to its WhatsApp groups:
 
 ```yaml
-name: "שם הקורס"
-instructor: "שם המרצה"
+name: "AI לעורכי דין — קורס מתקדמים"
+instructor: "לפידות וינברגר"
 botName: "לפיבוט"
 language: "he"
-description: "תיאור קצר של הקורס"
+description: "קורס מתקדם לשילוב בינה מלאכותית בעבודה המשפטית"
 whatsappGroups:
-  - "120363xxxxx@g.us"    # WhatsApp group ID
+  - "120363xxxxxxxx@g.us"
 media:
   images: true
   documents: true
   voice: true
 ```
 
-See `example-course/` for a complete working example with sample config, participants, schedule, and lessons.
+## The System Prompt
 
-## System Prompt
+The bot's personality is defined in [`system-prompt.md`](./system-prompt.md) — a detailed Hebrew prompt that establishes:
 
-The bot's personality, behavior, and formatting rules are defined in `system-prompt.md` (included in this repo). It uses `{{placeholders}}` filled per-course from `config.yaml`:
+- **Persona** — professional, direct tone matching the instructor's teaching style
+- **WhatsApp formatting rules** — single-asterisk bold, no Markdown links, no tables (they break in WhatsApp), RTL-aware mixed-language handling
+- **Search behavior** — when to search summaries vs. full transcripts, when to link to recordings
+- **Boundaries** — only answer course-related questions, never fabricate content, redirect off-topic questions
 
-- `{{botName}}` — bot display name (e.g., "לפיבוט")
-- `{{courseName}}` — course name
-- `{{instructor}}` — instructor name
-- `{{description}}` — course description
-- `{{currentDateTime}}` — injected at runtime
+The prompt uses `{{placeholders}}` (`{{botName}}`, `{{courseName}}`, `{{instructor}}`, etc.) that are filled per-course from `config.yaml`. Each course can also have its own `prompt.md` with additional instructions.
 
-Each course can also have its own `prompt.md` with additional instructions appended to the system prompt.
+## Deployment
 
-## Environment Variables
+The system runs on a VPS with Docker Compose — two containers:
 
-| Variable | Description |
-|----------|-------------|
-| `WAHA_API_URL` | WAHA server URL (default: `http://waha:3000`) |
-| `WAHA_SESSION` | WAHA session name (default: `default`) |
-| `WAHA_API_KEY` | WAHA API authentication key |
-| `WAHA_WEBHOOK_SECRET` | Shared HMAC secret for webhook verification |
-| `ANTHROPIC_API_KEY` | Anthropic API key for Claude |
-| `PORT` | Server port (default: `3001`) |
-| `BOT_MENTION_NAME` | Bot name for @mention detection (default: `לפיבוט`) |
-| `BOT_PHONE_NUMBER` | Bot's WhatsApp number (for reply detection) |
-| `COURSES_PATH` | Path to courses folder (default: `./courses`) |
-| `ADMIN_CHAT_ID` | WhatsApp chat ID for admin alerts |
-| `GITHUB_WEBHOOK_SECRET` | HMAC secret for GitHub webhook signature verification |
-| `GITHUB_COURSES_REPO` | GitHub repo for courses (e.g., `user/lapibot-courses`) |
-| `VPS_HOST` | SSH target for deploy script |
-| `VPS_PROJECT_DIR` | Remote project path (default: `/opt/lapibot-course-assistant`) |
-| `VPS_COURSES_DIR` | Remote courses path (default: `/opt/lapibot-courses`) |
+- **WAHA** (WhatsApp HTTP API) — self-hosted WhatsApp Web bridge using the NOWEB engine. Receives messages from WhatsApp and forwards them as webhooks to the app. Dashboard accessible only via SSH tunnel.
+- **App** — Node.js server that processes webhooks, runs the agentic loop, and sends responses back through WAHA. Also runs a GitHub webhook server on a separate port for auto-pulling course updates.
 
-## Docker Services
+The courses repository is mounted as a Docker volume. When course content is updated on GitHub, a webhook hits port 3002, the app verifies the HMAC signature, runs `git pull --ff-only`, and reloads all course configs — no restart needed.
 
-- **waha**: WAHA Plus (WhatsApp Web API, NOWEB engine). Port 3000, accessible only via SSH tunnel.
-- **app**: Node.js bot server. Port 3001 (internal, WAHA webhooks). Port 3002 (public, GitHub webhook for auto-pull).
+Deploys are a single command: SSH into the VPS, pull both repos, rebuild the Docker image, and restart.
 
-## AI Model
+## Key Technical Decisions
 
-- Primary: `claude-sonnet-4-6` with retries on 529 overload (exponential backoff)
-- Fallback: `claude-haiku-4-5-20251001` if primary exhausted
+- **Model fallback**: Primary model is Claude Sonnet 4.6. On rate limit or overload (529), retries with exponential backoff (3 attempts). If all fail, falls back to Claude Haiku for that request.
+- **Per-group sequential queue**: Messages for the same group are processed one at a time to prevent race conditions and keep responses ordered. Different groups process in parallel.
+- **Rate limiting**: Per-chat rate limiter (10 invocations/minute) prevents cost spikes from message storms.
+- **DM enrollment check**: For direct messages, the bot resolves the sender's phone number (NOWEB engine uses LIDs, not phone numbers) and checks it against `participants.csv` to verify enrollment.
+- **Path traversal protection**: All file operations are sandboxed to the course folder — the bot cannot read files outside its designated course directory.
+- **HMAC webhook verification**: Both WAHA webhooks and GitHub webhooks are verified with HMAC signatures.
+- **Multimodal input**: Students can send images and documents (per-course toggleable). Media is downloaded from WAHA, base64-encoded, and sent to Claude as part of the message.
 
-## Auto-Pull Course Updates
+## Tech Stack
 
-When changes are pushed to the courses repo's `main` branch, a GitHub webhook notifies the bot at port 3002. The bot verifies the HMAC signature, runs `git pull --ff-only`, and hot-reloads all course configs. See `src/github-webhook.ts`.
+- **TypeScript** / Node.js / Express
+- **Claude API** (Anthropic SDK) with tool-use
+- **WAHA Plus** — self-hosted WhatsApp Web API
+- **Docker Compose** — two-service deployment
+- **PapaParse** — CSV parsing for participant data
 
-## Phase 2
+## Source Files
 
-See [PHASE2.md](./PHASE2.md) for planned features: message database, backoffice bot, analytics, multi-tenant support, and more.
+| File | Role |
+|------|------|
+| [`src/student-bot.ts`](./src/student-bot.ts) | Core logic — agentic tool-use loop with Claude |
+| [`src/webhook-handler.ts`](./src/webhook-handler.ts) | WAHA webhook routing — groups, DMs, rate limiting, queuing |
+| [`src/course-tools.ts`](./src/course-tools.ts) | Tool definitions and execution (search, read, list, send) |
+| [`src/course-config.ts`](./src/course-config.ts) | Course loading, group routing map, enrollment lookup |
+| [`src/waha-client.ts`](./src/waha-client.ts) | WAHA API wrapper — send messages, fetch history, media |
+| [`src/media-handler.ts`](./src/media-handler.ts) | Media classification and download (images, docs) |
+| [`src/github-webhook.ts`](./src/github-webhook.ts) | GitHub webhook — auto-pull courses + hot-reload |
+| [`src/index.ts`](./src/index.ts) | Express server entry point |
+| [`system-prompt.md`](./system-prompt.md) | Bot persona and behavior (Hebrew, with `{{placeholders}}`) |
 
-## Key Files
+## Roadmap
 
-| File | Description |
-|------|-------------|
-| `src/index.ts` | Express server entry point |
-| `src/webhook-handler.ts` | WAHA webhook parsing + group/DM routing |
-| `src/student-bot.ts` | Agentic tool-use loop with Claude (core logic) |
-| `src/course-tools.ts` | Tool definitions: search_files, read_file, list_files, send_file |
-| `src/media-handler.ts` | Download + encode media from WAHA (images, docs) |
-| `src/waha-client.ts` | WAHA API wrapper (send messages, fetch history) |
-| `src/course-config.ts` | Load course configs, build group→course routing map |
-| `src/github-webhook.ts` | GitHub webhook for auto-pulling course updates |
-| `system-prompt.md` | Bot system prompt — persona, formatting rules, behavior |
+See [PHASE2.md](./PHASE2.md) for planned features: message database, voice message transcription, proactive reminders, analytics dashboard, and multi-tenant support.
