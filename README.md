@@ -6,6 +6,10 @@ Lapibot's intelligence is built around an agentic loop using Claude API with cus
 
 > **This repository is published as a portfolio showcase.** The source code is provided for review and reference only. Course materials (lesson content, participant data, recordings) are proprietary and stored in a separate private repository. See [License](#license).
 
+<p align="center">
+  <img src="./Lapibot Demo compressed.gif" alt="Lapibot Demo" width="480">
+</p>
+
 ---
 
 ## How It Works
