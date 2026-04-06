@@ -161,12 +161,6 @@ Deploys are a single command: `npm run deploy` — SSH into the VPS, pull both r
 | [`src/types.ts`](./src/types.ts) | Types — TypeScript interfaces for courses, webhooks, messages, media, tool results |
 | [`system-prompt.md`](./system-prompt.md) | Prompt — bot persona and behavior instructions (Hebrew, with `{{placeholders}}`) |
 
-## Roadmap
-
-See [PHASE2.md](./PHASE2.md) for planned features: message database, voice transcription, proactive reminders, analytics, and multi-tenant support.
-
----
-
 ## License
 
 All rights reserved. This source code is published for portfolio review and reference only. No permission is granted to use, copy, modify, or distribute this code for any purpose without explicit written permission from the author.
