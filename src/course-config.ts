@@ -49,7 +49,7 @@ export interface ParticipantRow {
 /**
  * Parse participants.csv into structured rows using proper CSV parsing.
  * Handles quoted fields with commas correctly.
- * Phone normalization: 05xx → 972xx, strips annotations like "(עוז כהן)".
+ * Phone normalization: strips annotations in parentheses and non-numeric characters.
  */
 export function parseParticipantsCsv(coursePath: string): ParticipantRow[] {
   const csvPath = path.join(coursePath, 'participants.csv');
@@ -60,20 +60,20 @@ export function parseParticipantsCsv(coursePath: string): ParticipantRow[] {
   const records = result.data as Record<string, string>[];
 
   return records
-    .filter(r => r['שם פרטי'])
+    .filter(r => r['nombre'])
     .map(r => {
-      let phone = (r['טלפון'] || r['סלולרי'] || '').replace(/\s*\(.*?\)\s*/g, '').replace(/[^0-9]/g, '');
+      let phone = (r['telefono'] || r['celular'] || '').replace(/\s*\(.*?\)\s*/g, '').replace(/[^0-9]/g, '');
 
-      const firstName = r['שם פרטי'];
-      const lastName = r['שם משפחה'] || '';
+      const firstName = r['nombre'];
+      const lastName = r['apellido'] || '';
       return {
         name: lastName ? `${firstName} ${lastName}` : firstName,
         firstName,
         phone,
-        title: r['תואר'] || '',
-        practice: r['תחום עיסוק'] || '',
-        aiTools: r['כלי AI בשימוש'] || '',
-        notes: r['הערות וציפיות'] || '',
+        title: r['titulo'] || '',
+        practice: r['area de practica'] || '',
+        aiTools: r['herramientas de IA'] || '',
+        notes: r['notas'] || '',
       };
     });
 }
@@ -153,7 +153,7 @@ export function loadDmNotEnrolledMessage(): string {
   if (fs.existsSync(filePath)) {
     dmNotEnrolledMessage = fs.readFileSync(filePath, 'utf-8').trim();
   } else {
-    dmNotEnrolledMessage = 'שלום! אני לפיבוט, העוזר הלימודי של קורסי AI4LAW.\nאני זמין רק למשתתפי הקורסים.';
+    dmNotEnrolledMessage = '¡Hola! Soy Lapibot, el asistente académico de los cursos de AI4LAW.\nSolo estoy disponible para los participantes de los cursos.';
   }
   return dmNotEnrolledMessage;
 }

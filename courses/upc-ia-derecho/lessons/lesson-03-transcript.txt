@@ -1,0 +1,6 @@
+[00:24:10] Lapidot: Bien, vamos con MCP, que es de lo más útil que van a ver en el curso.
+[00:24:29] Lapidot: Piénsenlo como un restaurante. Ustedes son el comensal, el modelo es el comensal. No entran a la cocina, ¿verdad? Le dicen al mozo qué quieren. El mozo es el servidor MCP. La cocina, donde están sus datos, sus expedientes, su jurisprudencia, esa es su información sensible.
+[00:25:05] Lapidot: El modelo nunca toca la cocina directamente. Le pide al mozo, y el mozo decide qué sacar y qué no. Eso es control. Eso es seguridad.
+[00:38:15] Lapidot: Ahora, ¿cómo conectamos Claude a una base de jurisprudencia? Levantamos un servidor MCP que sepa consultar esa base. El modelo le pregunta al servidor, no a la base.
+[00:51:40] Lapidot: ¿Local o remoto? Si los datos son sensibles, los de sus clientes, prefieran local: corre en su máquina, no sale a ningún lado. Si es algo que quieren compartir con el equipo, remoto, pero cuidando la privacidad.
+[00:53:00] Lapidot: La pregunta que siempre se tienen que hacer es: ¿qué tan sensible es lo que estoy conectando? Esa respuesta decide la arquitectura.

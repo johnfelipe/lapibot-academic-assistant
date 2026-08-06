@@ -1,0 +1,11 @@
+name: "IA Aplicada al Derecho — UPC"
+instructor: "Lapidot Weinberger"
+botName: "Lapibot"
+language: "es"
+description: "Curso de la Universidad Peruana de Ciencias Aplicadas (UPC) sobre el uso práctico de la inteligencia artificial en el trabajo jurídico. Programa de 9 sesiones para estudiantes y profesionales del Derecho."
+whatsappGroups:
+  - "120363000000000000@g.us"
+media:
+  images: true
+  documents: true
+  voice: true

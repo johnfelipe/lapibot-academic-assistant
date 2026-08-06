@@ -16,11 +16,11 @@ function classifyMedia(mimetype: string): 'image' | 'document' | 'audio' | null 
   return null;
 }
 
-/** Hebrew labels for media types (for disabled-type responses) */
+/** Spanish labels for media types (for disabled-type responses) */
 const mediaTypeLabels: Record<string, string> = {
-  image: 'תמונות',
-  document: 'מסמכים',
-  audio: 'הודעות קוליות',
+  image: 'imágenes',
+  document: 'documentos',
+  audio: 'mensajes de voz',
 };
 
 /**
@@ -55,7 +55,7 @@ export async function processMedia(
   const configKey = mediaType === 'image' ? 'images' : mediaType === 'document' ? 'documents' : 'voice';
   if (!mediaConfig[configKey]) {
     return {
-      disabledMessage: `אני לא מוגדר לקרוא ${mediaTypeLabels[mediaType]} בקבוצה הזו`,
+      disabledMessage: `No estoy configurado para leer ${mediaTypeLabels[mediaType]} en este grupo`,
     };
   }
 
@@ -75,7 +75,7 @@ export async function processMedia(
   } catch (err) {
     log('error', 'Failed to download media', { error: String(err), messageId: message.id });
     return {
-      disabledMessage: 'לא הצלחתי לקרוא את הקובץ שצירפת. אפשר לנסות שוב?',
+      disabledMessage: 'No pude leer el archivo que adjuntaste. ¿Puedes intentarlo de nuevo?',
     };
   }
 }

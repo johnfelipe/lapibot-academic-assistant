@@ -128,14 +128,14 @@ async function sendCourseFile(
   try {
     const fullPath = safePath(coursePath, relativePath);
     if (!fs.existsSync(fullPath)) {
-      return `הקובץ לא נמצא: ${relativePath}`;
+      return `Archivo no encontrado: ${relativePath}`;
     }
     const stat = fs.statSync(fullPath);
     if (stat.isDirectory()) {
-      return `הנתיב הוא תיקייה, לא קובץ: ${relativePath}`;
+      return `La ruta es una carpeta, no un archivo: ${relativePath}`;
     }
     if (stat.size > MAX_FILE_SIZE) {
-      return `הקובץ גדול מדי לשליחה בוואטסאפ (מעל 100MB): ${relativePath}`;
+      return `El archivo es demasiado grande para enviar por WhatsApp (más de 100MB): ${relativePath}`;
     }
 
     const fileData = fs.readFileSync(fullPath).toString('base64');
@@ -143,13 +143,13 @@ async function sendCourseFile(
     const mimetype = getMimeType(fullPath);
 
     await sendFile(chatId, fileData, filename, mimetype, caption);
-    return `הקובץ "${filename}" נשלח בהצלחה.`;
+    return `El archivo "${filename}" se envió correctamente.`;
   } catch (err) {
     if (err instanceof Error && err.message === 'Path traversal denied') {
-      return 'גישה נדחתה: הנתיב מחוץ לתיקיית הקורס.';
+      return 'Acceso denegado: la ruta está fuera de la carpeta del curso.';
     }
     log('error', 'send_file error', { error: String(err) });
-    return 'שגיאה בשליחת הקובץ.';
+    return 'Error al enviar el archivo.';
   }
 }
 
@@ -232,7 +232,7 @@ export async function executeTool(
     case 'list_files':
       return listFiles(coursePath, input.folder);
     case 'send_file':
-      if (!chatId) return 'שגיאה: לא ניתן לשלוח קובץ ללא מזהה צ׳אט.';
+      if (!chatId) return 'Error: no se puede enviar un archivo sin un identificador de chat.';
       return sendCourseFile(coursePath, input.path, chatId, input.caption);
     default:
       return `Unknown tool: ${toolName}`;

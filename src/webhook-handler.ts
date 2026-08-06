@@ -6,7 +6,7 @@ import { processMedia } from './media-handler';
 import { handleStudentQuestion } from './student-bot';
 import { sendTextMessage, getSessionStatus, resolveLidToPhone } from './waha-client';
 
-const BOT_MENTION_NAME = process.env.BOT_MENTION_NAME || 'לפיבוט';
+const BOT_MENTION_NAME = process.env.BOT_MENTION_NAME || 'Lapibot';
 const BOT_PHONE_NUMBER = process.env.BOT_PHONE_NUMBER || '';
 const WAHA_WEBHOOK_SECRET = process.env.WAHA_WEBHOOK_SECRET || '';
 const ADMIN_CHAT_ID = process.env.ADMIN_CHAT_ID || '';
@@ -302,7 +302,7 @@ export async function handleWebhook(req: Request, res: Response): Promise<void> 
     log('warn', 'Unrecognized group', { groupId });
     // Attempt to extract group name from message data
     const groupName = message._data?.id?.remote || groupId;
-    await notifyAdmin(`קבוצה לא מוגדרת: ${groupName} (${groupId})`);
+    await notifyAdmin(`Grupo no configurado: ${groupName} (${groupId})`);
     return;
   }
 
