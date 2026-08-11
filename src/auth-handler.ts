@@ -15,7 +15,7 @@
 import { Pool } from 'pg';
 import bcrypt from 'bcrypt';
 import { log } from './types';
-import { sendTextMessage } from './waha-client';
+import { sendTextMessage, deleteMessage } from './waha-client';
 
 // ─── Configuration ───────────────────────────────────────────────────────────
 
@@ -175,7 +175,7 @@ function clearFailedAttempts(chatId: string): void {
  * - 'authenticated' if user has active session (proceed to bot)
  * - 'handled' if message was consumed by auth flow (don't process further)
  */
-export async function handleAuthFlow(chatId: string, messageBody: string): Promise<'authenticated' | 'handled'> {
+export async function handleAuthFlow(chatId: string, messageBody: string, messageId?: string): Promise<'authenticated' | 'handled'> {
   // 1. Check if already authenticated
   if (isAuthenticated(chatId)) {
     // Check for logout command
@@ -227,9 +227,17 @@ export async function handleAuthFlow(chatId: string, messageBody: string): Promi
   }
 
   if (state.step === 'awaiting_password') {
-    // User sent their password
+    // User sent their password — delete it immediately for security
     const password = messageBody.trim();
     const username = state.username!;
+
+    // Delete the password message from chat (security: don't leave passwords visible)
+    if (messageId) {
+      deleteMessage(chatId, messageId).catch(() => {});
+    }
+
+    // Send a masked confirmation so user knows we received it
+    await sendTextMessage(chatId, '🔑 Contraseña recibida: ********\n\nVerificando credenciales...');
 
     // Clear login state
     loginStates.delete(chatId);

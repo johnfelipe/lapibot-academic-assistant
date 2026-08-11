@@ -239,7 +239,9 @@ export async function handleWebhook(req: Request, res: Response): Promise<void> 
     // ─── Authentication Gate ─────────────────────────────────────────
     // Before processing any DM, check authentication status.
     // If user is not authenticated, the auth flow handles the message.
-    const authResult = await handleAuthFlow(message.from, message.body?.trim() || '');
+    // Extract message ID for potential deletion (security: password messages)
+    const incomingMessageId = message.id || message._data?.id?._serialized || '';
+    const authResult = await handleAuthFlow(message.from, message.body?.trim() || '', incomingMessageId);
     if (authResult === 'handled') {
       // Message was consumed by the auth flow (login steps)
       return;

@@ -102,9 +102,34 @@ export async function getSessionStatus(): Promise<{ status: string; me?: { id: s
 }
 
 /**
- * Resolve a LID to a phone number using WAHA's LID API.
- * Returns the phone number (e.g. "972501234567") or null if not found.
+ * Delete a message from a chat.
+ * Used to remove password messages for security.
  */
+export async function deleteMessage(chatId: string, messageId: string): Promise<void> {
+  try {
+    await wahaFetch(`/api/${WAHA_SESSION}/chats/${chatId}/messages/${messageId}`, {
+      method: 'DELETE',
+    });
+    log('info', 'Message deleted (security)', { chatId, messageId });
+  } catch (err) {
+    // Try alternative endpoint format
+    try {
+      await wahaFetch(`/api/messages/delete`, {
+        method: 'POST',
+        body: JSON.stringify({
+          session: WAHA_SESSION,
+          chatId,
+          messageId,
+          forEveryone: true,
+        }),
+      });
+      log('info', 'Message deleted via alt endpoint (security)', { chatId, messageId });
+    } catch (err2) {
+      log('warn', 'Could not delete message', { chatId, messageId, error: String(err2) });
+    }
+  }
+}
+
 export async function resolveLidToPhone(lid: string): Promise<string | null> {
   try {
     const id = lid.replace(/@.*/, '');
