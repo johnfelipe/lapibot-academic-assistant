@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import { Request, Response } from 'express';
 import { WebhookPayload, WebhookMessage, BotInvocation, log } from './types';
 import { getCourseForGroup, getCourseForPhone, loadDmNotEnrolledMessage } from './course-config';
+import { handleAuthFlow, isAuthenticated, getAuthSession, initAuthDatabase } from './auth-handler';
 import { processMedia } from './media-handler';
 import { handleStudentQuestion } from './student-bot';
 import { sendTextMessage, getSessionStatus, resolveLidToPhone } from './waha-client';
@@ -235,17 +236,62 @@ export async function handleWebhook(req: Request, res: Response): Promise<void> 
   if (!isGroupMessage(message)) {
     res.status(200).json({ ok: true, processing: true });
 
+    // ─── Authentication Gate ─────────────────────────────────────────
+    // Before processing any DM, check authentication status.
+    // If user is not authenticated, the auth flow handles the message.
+    const authResult = await handleAuthFlow(message.from, message.body?.trim() || '');
+    if (authResult === 'handled') {
+      // Message was consumed by the auth flow (login steps)
+      return;
+    }
+    // authResult === 'authenticated' → proceed to conversational AI
+    // ─────────────────────────────────────────────────────────────────
+
     // Resolve phone: NOWEB engine sends DMs from LIDs, not phone JIDs
     let phone = extractPhoneFromJid(message.from);
     if (message.from.endsWith('@lid')) {
       const resolved = await resolveLidToPhone(message.from);
       if (resolved) phone = resolved;
     }
+
+    // Use auth session display name if available, otherwise fall back to enrollment
+    const authSession = getAuthSession(message.from);
     const enrollment = getCourseForPhone(phone);
 
+    // If not enrolled but authenticated, use first available course
     if (!enrollment) {
-      log('info', 'DM from non-enrolled user', { phone });
-      await sendTextMessage(message.from, loadDmNotEnrolledMessage());
+      log('info', 'Authenticated user not in enrollment CSV, using default course', { phone, username: authSession?.username });
+      // For authenticated users not in CSV, we still allow access
+      // They get the first available course context
+      const { getDefaultCourse } = require('./course-config');
+      const defaultCourse = getDefaultCourse();
+      if (!defaultCourse) {
+        await sendTextMessage(message.from, 'No hay cursos configurados en este momento.');
+        return;
+      }
+
+      if (!checkRateLimit(message.from)) {
+        log('warn', 'Rate limit exceeded for DM', { phone });
+        return;
+      }
+
+      const { media, disabledMessage } = await processMedia(message, defaultCourse);
+      if (disabledMessage) {
+        await sendTextMessage(message.from, disabledMessage);
+        return;
+      }
+
+      const invocation: BotInvocation = {
+        message,
+        course: defaultCourse,
+        studentName: authSession?.displayName || 'Usuario',
+        questionText: message.body?.trim() || '',
+        media,
+        isDm: true,
+        chatId: message.from,
+      };
+
+      enqueueQuestion(message.from, invocation);
       return;
     }
 
@@ -265,7 +311,7 @@ export async function handleWebhook(req: Request, res: Response): Promise<void> 
     const invocation: BotInvocation = {
       message,
       course: enrollment.course,
-      studentName: enrollment.studentName,
+      studentName: authSession?.displayName || enrollment.studentName,
       questionText: message.body?.trim() || '',
       media,
       isDm: true,

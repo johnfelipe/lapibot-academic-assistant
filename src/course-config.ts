@@ -157,3 +157,17 @@ export function loadDmNotEnrolledMessage(): string {
   }
   return dmNotEnrolledMessage;
 }
+
+/**
+ * Returns the first available course context (for authenticated users not in CSV).
+ */
+export function getDefaultCourse(): CourseContext | undefined {
+  const firstGroup = groupCourseMap.values().next();
+  if (!firstGroup.done) return firstGroup.value;
+
+  // Fallback: try loading from phoneCourseMap
+  const firstPhone = phoneCourseMap.values().next();
+  if (!firstPhone.done) return firstPhone.value.course;
+
+  return undefined;
+}

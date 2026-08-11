@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import express from 'express';
 import { handleWebhook, initBotIdentifiers } from './webhook-handler';
+import { initAuthDatabase } from './auth-handler';
 import { loadAllCourses } from './course-config';
 import { getSessionStatus } from './waha-client';
 import { startGitHubWebhookServer } from './github-webhook';
@@ -46,6 +47,8 @@ loadAllCourses();
 
 app.listen(PORT, async () => {
   log('info', `Lapibot server started on port ${PORT}`);
+  // Initialize auth database (creates table if not exists)
+  await initAuthDatabase();
   // Fetch bot's LID from WAHA (needed for NOWEB mention detection)
   await initBotIdentifiers();
 });
