@@ -44,9 +44,21 @@ export async function sendTextMessage(chatId: string, text: string, replyTo?: st
   const data = await wahaFetch('/api/sendText', {
     method: 'POST',
     body: JSON.stringify(body),
-  }) as { id?: { _serialized?: string; id?: string } };
+  }) as { key?: { remoteJid?: string; fromMe?: boolean; id?: string }; id?: { _serialized?: string; id?: string } };
 
-  const messageId = data.id?._serialized || data.id?.id || 'sent';
+  // WAHA returns: { key: { remoteJid, fromMe, id }, ... }
+  // Build full message ID format: true_chatId_keyId (for bot's own messages)
+  let messageId = 'sent';
+  if (data.key?.id) {
+    const fromMe = data.key.fromMe ? 'true' : 'false';
+    const remoteJid = data.key.remoteJid || chatId;
+    messageId = `${fromMe}_${remoteJid}_${data.key.id}`;
+  } else if (data.id?._serialized) {
+    messageId = data.id._serialized;
+  } else if (data.id?.id) {
+    messageId = data.id.id;
+  }
+
   log('info', 'Message sent', { chatId, messageId });
   return messageId;
 }
@@ -102,31 +114,21 @@ export async function getSessionStatus(): Promise<{ status: string; me?: { id: s
 }
 
 /**
- * Delete a message from a chat.
- * Used to remove password messages for security.
+ * Edit a bot's own message in a chat.
+ * Used to replace the "enter your password" prompt with masked text after receiving it.
+ * Only works for messages sent BY the bot (fromMe=true).
+ * 
+ * WAHA endpoint: PUT /api/{session}/chats/{chatId}/messages/{fullMessageId}
  */
-export async function deleteMessage(chatId: string, messageId: string): Promise<void> {
+export async function editMessage(chatId: string, messageId: string, newText: string): Promise<void> {
   try {
-    await wahaFetch(`/api/${WAHA_SESSION}/chats/${chatId}/messages/${messageId}`, {
-      method: 'DELETE',
+    await wahaFetch(`/api/${WAHA_SESSION}/chats/${chatId}/messages/${encodeURIComponent(messageId)}`, {
+      method: 'PUT',
+      body: JSON.stringify({ text: newText }),
     });
-    log('info', 'Message deleted (security)', { chatId, messageId });
+    log('info', 'Message edited (security)', { chatId, messageId });
   } catch (err) {
-    // Try alternative endpoint format
-    try {
-      await wahaFetch(`/api/messages/delete`, {
-        method: 'POST',
-        body: JSON.stringify({
-          session: WAHA_SESSION,
-          chatId,
-          messageId,
-          forEveryone: true,
-        }),
-      });
-      log('info', 'Message deleted via alt endpoint (security)', { chatId, messageId });
-    } catch (err2) {
-      log('warn', 'Could not delete message', { chatId, messageId, error: String(err2) });
-    }
+    log('warn', 'Could not edit message', { chatId, messageId, error: String(err) });
   }
 }
 

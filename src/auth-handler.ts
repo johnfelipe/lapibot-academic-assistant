@@ -15,7 +15,7 @@
 import { Pool } from 'pg';
 import bcrypt from 'bcrypt';
 import { log } from './types';
-import { sendTextMessage, deleteMessage } from './waha-client';
+import { sendTextMessage, editMessage } from './waha-client';
 
 // ─── Configuration ───────────────────────────────────────────────────────────
 
@@ -50,6 +50,7 @@ interface AuthSession {
 interface LoginState {
   step: 'awaiting_username' | 'awaiting_password';
   username?: string;
+  passwordPromptMessageId?: string; // Bot's own "enter password" message ID (for editing)
   startedAt: number;
 }
 
@@ -220,24 +221,26 @@ export async function handleAuthFlow(chatId: string, messageBody: string, messag
       return 'handled';
     }
 
-    // Move to password step
-    loginStates.set(chatId, { step: 'awaiting_password', username, startedAt: state.startedAt });
-    await sendTextMessage(chatId, `Ahora ingresa tu *contraseña*:`);
+    // Move to password step — save the bot's prompt message ID so we can edit it later
+    const promptMsgId = await sendTextMessage(chatId, `Ahora ingresa tu *contraseña*:`);
+    loginStates.set(chatId, { step: 'awaiting_password', username, passwordPromptMessageId: promptMsgId, startedAt: state.startedAt });
     return 'handled';
   }
 
   if (state.step === 'awaiting_password') {
-    // User sent their password — delete it immediately for security
+    // User sent their password
     const password = messageBody.trim();
     const username = state.username!;
 
-    // Delete the password message from chat (security: don't leave passwords visible)
-    if (messageId) {
-      deleteMessage(chatId, messageId).catch(() => {});
+    // Edit the bot's own "enter password" prompt to show masked text
+    // This replaces "Ahora ingresa tu contraseña:" with "🔑 ********"
+    // so the password prompt no longer invites others to read the next message
+    if (state.passwordPromptMessageId) {
+      editMessage(chatId, state.passwordPromptMessageId, '🔑 Contraseña: ********').catch(() => {});
     }
 
-    // Send a masked confirmation so user knows we received it
-    await sendTextMessage(chatId, '🔑 Contraseña recibida: ********\n\nVerificando credenciales...');
+    // Send confirmation + reminder to delete their own message
+    await sendTextMessage(chatId, '🔑 Contraseña recibida.\n\n⚠️ *Por seguridad, elimina tu mensaje con la contraseña* (mantén presionado → Eliminar para todos).\n\nVerificando credenciales...');
 
     // Clear login state
     loginStates.delete(chatId);
